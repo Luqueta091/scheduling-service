@@ -9,8 +9,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    env:
-      TEST_USE_LOCAL_DB: "true"
+
     services:
       postgres:
         image: postgres:15
@@ -19,17 +18,18 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: scheduling_test
         ports:
-          - 5432:5432
+          - "5432:5432"
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -37,32 +37,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build shared package (workspaces)
+      - name: Build shared workspace
         run: npm run build:shared || npm run build
 
-      - name: Wait for Postgres
+      - name: Wait for Postgres to be ready
         run: |
+          echo "Checking Postgres status..."
           until pg_isready -h localhost -p 5432 -U postgres; do
-            echo "Waiting for postgres..."
+            echo "Postgres is not ready yet..."
             sleep 2
           done
+          echo "Postgres is ready."
 
-      - name: Export DB URL
-        run: echo "TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
+      - name: Export DB URLs
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
 
-      - name: Run DB migrations
+      - name: Run migrations
         run: npm run migrate
 
-      - name: Build app
+      - name: Build application
         run: npm run build
 
-      - name: Run deterministic tests (single-thread)
+      - name: Run deterministic test suite (single-thread)
         run: npm run test:ci
 
       - name: Run concurrency test
         run: npm run test:concurrency
 
-      - name: Upload evidence (if needed)
+      - name: Upload logs and evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
