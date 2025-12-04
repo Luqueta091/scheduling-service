@@ -1,0 +1,11 @@
+{
+  "name": "@barbershop/shared",
+  "version": "0.1.0",
+  "description": "Shared utilities for scheduling platform services",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

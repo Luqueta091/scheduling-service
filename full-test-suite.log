@@ -1,0 +1,145 @@
+
+> scheduling-service@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /Users/joelsonqueiroz/CascadeProjects/scheduling-service
+
+ ✓ tests/dtos/appointmentDto.test.ts  (4 tests) 19ms
+ ✓ tests/shared/config.test.ts  (2 tests) 743ms
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController
+[TEST DEBUG setup] createSharedDependencies {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test","envTestDatabaseUrl":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/integration/booking_concurrency.test.ts
+[TEST DEBUG setup] createSharedDependencies {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test","envTestDatabaseUrl":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+{"level":30,"time":1764861165467,"service":"scheduling-service","migration":"20251203_01_create_reservations.sql","msg":"Applying migration"}
+{"level":30,"time":1764861165472,"service":"scheduling-service","migration":"20251203_02_create_appointments.sql","msg":"Applying migration"}
+{"level":30,"time":1764861165475,"service":"scheduling-service","migration":"20251203_03_alter_reservations_nullable_expires.sql","msg":"Applying migration"}
+{"level":30,"time":1764861165518,"service":"scheduling-service","migration":"20251203_create_idempotency_keys.sql","msg":"Applying migration"}
+{"level":30,"time":1764861165519,"service":"scheduling-service","executed":4,"msg":"All migrations applied"}
+stdout | tests/integration/booking_concurrency.test.ts
+[TEST DEBUG setup] setupTestDatabase-local {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test","envTestDatabaseUrl":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+ ❯ tests/integration/booking_concurrency.test.ts  (1 test | 1 failed) 305ms
+   ❯ tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+     → eventBus.clearAllSubscribers is not a function
+     → eventBus.clearAllSubscribers is not a function
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController
+[TEST DEBUG setup] setupTestDatabase-local {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test","envTestDatabaseUrl":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+ ✓ tests/shared/logger.test.ts  (1 test) 702ms
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+[TEST DEBUG setup] truncateAll {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+stdout | tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+[TEST DEBUG setup] clearEventBus {"pid":64763,"connectionString":"postgresql://postgres:postgres@localhost:5432/scheduling_test"}
+
+ ❯ tests/controllers/appointmentController.test.ts  (3 tests | 3 failed) 1244ms
+   ❯ tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+     → eventBus.clearAllSubscribers is not a function
+     → eventBus.clearAllSubscribers is not a function
+   ❯ tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+     → eventBus.clearAllSubscribers is not a function
+     → eventBus.clearAllSubscribers is not a function
+   ❯ tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+     → eventBus.clearAllSubscribers is not a function
+     → eventBus.clearAllSubscribers is not a function
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+TypeError: eventBus.clearAllSubscribers is not a function
+ ❯ clearEventBus tests/setup/testDb.ts:79:14
+     77|     });
+     78|     const { eventBus } = (await import('@barbershop/shared')) as unkno…
+     79|     eventBus.clearAllSubscribers();
+       |              ^
+     80|   };
+     81| 
+ ❯ tests/controllers/appointmentController.test.ts:20:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 201 when creating an appointment with valid payload
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 422 for invalid payload
+ FAIL  tests/controllers/appointmentController.test.ts > AppointmentController > returns 404 when appointment not found
+TypeError: eventBus.clearAllSubscribers is not a function
+ ❯ clearEventBus tests/setup/testDb.ts:79:14
+     77|     });
+     78|     const { eventBus } = (await import('@barbershop/shared')) as unkno…
+     79|     eventBus.clearAllSubscribers();
+       |              ^
+     80|   };
+     81| 
+ ❯ tests/controllers/appointmentController.test.ts:31:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+TypeError: eventBus.clearAllSubscribers is not a function
+ ❯ clearEventBus tests/setup/testDb.ts:79:14
+     77|     });
+     78|     const { eventBus } = (await import('@barbershop/shared')) as unkno…
+     79|     eventBus.clearAllSubscribers();
+       |              ^
+     80|   };
+     81| 
+ ❯ tests/integration/booking_concurrency.test.ts:20:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/integration/booking_concurrency.test.ts > Booking concurrency > confirms only one appointment for the same reservation token under load and honors idempotency
+TypeError: eventBus.clearAllSubscribers is not a function
+ ❯ clearEventBus tests/setup/testDb.ts:79:14
+     77|     });
+     78|     const { eventBus } = (await import('@barbershop/shared')) as unkno…
+     79|     eventBus.clearAllSubscribers();
+       |              ^
+     80|   };
+     81| 
+ ❯ tests/integration/booking_concurrency.test.ts:31:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ Test Files  2 failed | 3 passed (5)
+      Tests  4 failed | 7 passed (11)
+   Start at  12:12:41
+   Duration  4.89s (transform 316ms, setup 0ms, collect 5.72s, tests 3.01s, environment 2ms, prepare 2.28s)
+

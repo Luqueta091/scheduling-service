@@ -1,0 +1,113 @@
+# WindSurf import - Tasks for stabilizing test suite & DB-backed scheduling
+# Context: /mnt/data/documento_contexto_negocio.md
+
+- title: "Refactor: export createApp() factory (src/app.ts)"
+  description: |
+    Refatorar src/app.ts para expor uma factory createApp() que constrói
+    uma instância nova do Express com todos middlewares aplicados (express.json() primeiro),
+    registrando rotas, logger e error mapper. Manter default export compatível.
+    Objetivo: garantir que cada spec possa instanciar app isolado.
+    Contexto técnico: ver /mnt/data/documento_contexto_negocio.md
+  labels: ["backend","scheduling","tests","critical"]
+  priority: high
+  depends_on: []
+  acceptance_criteria:
+    - src/app.ts exports `createApp()` and default export remains (createApp()).
+    - express.json() is registered before any routes.
+    - No change in external API/ports.
+    - Unit tests referencing default export still work.
+  validation_commands:
+    - "npm run build"
+    - "node -e \"require('./dist/app').createApp && console.log('createApp OK')\""
+  estimate: 2h
+
+- title: "Tests: instantiate fresh app in all specs (use createApp)"
+  description: |
+    Update all test files to import createApp() and instantiate a NEW app instance per file/suite.
+    Replace any direct reuse of a global/singleton app. Ensure supertest(app) uses the new instance.
+    This avoids middleware/state leakage between tests.
+  labels: ["tests","scheduling","stability"]
+  priority: critical
+  depends_on: ["Refactor: export createApp() factory (src/app.ts)"]
+  acceptance_criteria:
+    - Each test file calls createApp() in beforeEach or beforeAll.
+    - No tests call app.use(...) directly at runtime.
+    - Running isolated test and full suite (see validation) produce no empty-body 422 errors.
+  validation_commands:
+    - "npm test -- --runInBand"
+    - "npm test 2>&1 | tee full-test-suite.log && grep -n \"Zod:\" full-test-suite.log || true"
+  estimate: 3h
+
+- title: "Test setup: truncate DB and clear eventbus between tests"
+  description: |
+    Add robust cleanup in tests/setup:
+    - truncateAll() beforeEach/afterEach for reservations, appointments, idempotency_keys
+    - eventbus.clearAllSubscribers() in afterEach (add helper in packages/shared if missing)
+    Purpose: ensure DB and in-memory eventbus do not leak state between tests.
+  labels: ["tests","infra","shared"]
+  priority: critical
+  depends_on: ["Tests: instantiate fresh app in all specs (use createApp)"]
+  acceptance_criteria:
+    - truncateAll() implemented and referenced in tests/setup.
+    - eventbus exposes clearAllSubscribers() and tests call it in afterEach.
+    - Running full suite eliminates intermittent empty-body 422 failures.
+  validation_commands:
+    - "npm test -- --runInBand"
+    - "npm run test:concurrency"
+  estimate: 2h
+
+- title: "Add defensive logging & reproduce full-suite failure (temporary)"
+  description: |
+    Add temporary logging in test setup and controller to capture:
+    - process pid, TEST_DATABASE_URL, and which test file is running
+    - incoming request headers and req.body at controller entry (debug only)
+    Purpose: capture the cause of empty-body in full-suite runs. Logs are temporary and will be removed once root cause fixed.
+  labels: ["debug","tests"]
+  priority: medium
+  depends_on: ["Test setup: truncate DB and clear eventbus between tests"]
+  acceptance_criteria:
+    - full-test-suite.log is produced and contains debug entries for empty-body events
+    - evidence of which test causes the body to be empty is found
+    - developer removes debug logs prior to merge
+  validation_commands:
+    - "npm test 2>&1 | tee full-test-suite.log"
+    - "grep -n \"DEBUG create appointment request\" full-test-suite.log || true"
+  estimate: 1h
+
+- title: "CI change: run migrations then tests in-band; run concurrency test separately"
+  description: |
+    Update CI pipeline to:
+    1) export TEST_USE_LOCAL_DB=true
+    2) npm run migrate
+    3) npm run build
+    4) npm test -- --runInBand (or --threads=1)
+    5) npm run test:concurrency
+    Rationale: provide deterministic environment until tests are fully isolated.
+  labels: ["ci","infra","tests"]
+  priority: high
+  depends_on: ["Test setup: truncate DB and clear eventbus between tests"]
+  acceptance_criteria:
+    - CI job runs migrations and test suite in deterministic mode
+    - Concurrency test runs and reports 1×201 + 19×409
+  validation_commands:
+    - "CI: export TEST_USE_LOCAL_DB=true; npm run migrate; npm run build; npm test -- --runInBand; npm run test:concurrency"
+  estimate: 1h
+
+- title: "Remove temporary debug logs & finalize PR"
+  description: |
+    After test suite is stable and concurrency evidence captured:
+    - Remove debug logs from controllers and test setup
+    - Update README and ADR with note about reservations.expires_at nullable on confirm
+    - Commit changes to branch feature/scheduling-db-fix and attach concurrency evidence
+  labels: ["docs","tests","cleanup"]
+  priority: medium
+  depends_on:
+    - "Add defensive logging & reproduce full-suite failure (temporary)"
+    - "CI change: run migrations then tests in-band; run concurrency test separately"
+  acceptance_criteria:
+    - No debug logs remain
+    - ADR updated with the migrations step
+    - PR contains evidence: full-test-suite.log and concurrency results (1×201 + 19×409)
+  validation_commands:
+    - "grep -R \"DEBUG create appointment request\" || true # should find nothing"
+  estimate: 0.5h

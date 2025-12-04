@@ -1,0 +1,61 @@
+{
+  "name": "scheduling-service",
+  "version": "0.1.0",
+  "description": "Authoritative scheduling microservice for barbershop appointments.",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "clean": "rimraf dist packages/shared/dist",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "start:prod": "node dist/server.js",
+    "build": "npm run build:shared && tsc -p tsconfig.build.json",
+    "build:shared": "tsc -p packages/shared/tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\" \"packages/shared/src/**/*.ts\"",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ci": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --watch",
+    "test:concurrency": "vitest run tests/integration/booking_concurrency.test.ts",
+    "migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@barbershop/shared": "file:packages/shared",
+    "@opentelemetry/api": "^1.8.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "pino": "^8.17.2",
+    "pino-http": "^8.6.1",
+    "prom-client": "^15.1.2",
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.1",
+    "yamljs": "^0.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^10.28.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
+    "@types/pg": "^8.11.5",
+    "@types/supertest": "^2.0.16",
+    "@types/swagger-ui-express": "^4.1.6",
+    "@types/uuid": "^9.0.7",
+    "@types/yamljs": "^0.2.34",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "@vitest/coverage-v8": "^1.4.0",
+    "@vitest/ui": "^1.4.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "rimraf": "^5.0.7",
+    "supertest": "^6.3.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.5",
+    "vitest": "^1.4.0"
+  }
+}
