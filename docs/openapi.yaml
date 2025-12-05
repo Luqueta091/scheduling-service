@@ -144,6 +144,8 @@ paths:
       summary: Marcar falta
       tags:
         - Agendamentos
+      security:
+        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -160,7 +162,6 @@ paths:
             examples:
               default:
                 value:
-                  markedBy: "barbeiro"
                   timestamp: "2025-12-03T15:45:00Z"
       responses:
         '200':
@@ -169,6 +170,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AppointmentResource'
+  /auth/login:
+    post:
+      summary: Login de barbeiro/admin
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Tokens gerados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensResponse'
+  /auth/refresh:
+    post:
+      summary: Renovar tokens
+      tags:
+        - Autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRefreshRequest'
+      responses:
+        '200':
+          description: Tokens renovados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensResponse'
   /slots/lock:
     post:
       summary: Exemplo de lock de slot (serviço Availability)
@@ -316,16 +353,56 @@ components:
           maxLength: 280
     MarkNoShowRequest:
       type: object
-      required:
-        - markedBy
-        - timestamp
       properties:
-        markedBy:
-          type: string
-          enum: [cliente, barbeiro, admin]
         timestamp:
           type: string
           format: date-time
+    AuthLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+    AuthRefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+    AuthTokensResponse:
+      type: object
+      required:
+        - accessToken
+        - refreshToken
+        - user
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          type: object
+          required:
+            - id
+            - email
+            - role
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            role:
+              type: string
+              enum: [barbeiro, admin]
     ErrorResponse:
       type: object
       required:
@@ -339,3 +416,8 @@ components:
         details:
           type: object
           additionalProperties: true
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

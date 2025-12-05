@@ -33,10 +33,8 @@ export function errorMapper(
 ): void {
   const reservationToken = req.header('x-reservation-token') ?? undefined;
   const status = mapStatusCode(err);
-
-  logger
-    .withContext({ reservationToken })
-    .error({ err, status, path: req.path, method: req.method }, 'Request failed');
+  const reqLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+  reqLogger.error({ err, status, path: req.path, method: req.method }, 'Request failed');
 
   if (res.headersSent) {
     return;

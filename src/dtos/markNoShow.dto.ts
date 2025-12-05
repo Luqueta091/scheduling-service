@@ -11,8 +11,7 @@ export const markNoShowParamsSchema = z.object({
 });
 
 export const markNoShowBodySchema = z.object({
-  markedBy: userRoleSchema,
-  timestamp: isoDateTimeSchema
+  timestamp: isoDateTimeSchema.optional()
 });
 
 export const markNoShowResponseSchema = appointmentResourceSchema.extend({

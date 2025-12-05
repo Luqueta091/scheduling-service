@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { Router } from 'express';
 
-import { logger } from '@barbershop/shared';
+import { logger, runWithSpan } from '@barbershop/shared';
 
 import type {
   CancelAppointmentBody,
@@ -19,29 +19,35 @@ import {
   markNoShowParamsSchema
 } from '../dtos';
 import type { AppointmentService } from '../application/services/appointmentService';
+import type { AuthMiddleware } from '../infrastructure/http/authMiddleware';
 
 export interface AppointmentControllerDependencies {
   service: AppointmentService;
+  auth?: AuthMiddleware;
 }
 
 function getReservationToken(req: Request): string | undefined {
   return req.header('x-reservation-token') ?? undefined;
 }
 
-export function createAppointmentController({ service }: AppointmentControllerDependencies): Router {
+export function createAppointmentController({ service, auth }: AppointmentControllerDependencies): Router {
   const router = Router();
 
   router.post('/agendamentos', async (req, res, next) => {
     try {
-      const reservationToken = getReservationToken(req);
-      const payload = createAppointmentRequestSchema.parse(req.body) satisfies CreateAppointmentRequest;
+      await runWithSpan('Controller:POST /agendamentos', async () => {
+        const reservationToken = getReservationToken(req);
+        const payload = createAppointmentRequestSchema.parse(req.body) satisfies CreateAppointmentRequest;
 
-      logger
-        .withContext({ reservationToken })
-        .info({ route: '/agendamentos', payload }, 'Creating appointment');
+        const requestLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+        requestLogger.info({ route: '/agendamentos', payload }, 'Creating appointment');
 
-      const appointment = await service.createAppointment(payload, req.headers as Record<string, string | undefined>);
-      res.status(201).json(appointment);
+        const appointment = await service.createAppointment(
+          payload,
+          req.headers as Record<string, string | undefined>
+        );
+        res.status(201).json(appointment);
+      });
     } catch (error) {
       next(error);
     }
@@ -49,19 +55,22 @@ export function createAppointmentController({ service }: AppointmentControllerDe
 
   router.get('/agendamentos/:id', async (req, res, next) => {
     try {
-      const reservationToken = getReservationToken(req);
-      const params = getAppointmentParamsSchema.parse(req.params);
+      await runWithSpan('Controller:GET /agendamentos/:id', async () => {
+        const reservationToken = getReservationToken(req);
+        const params = getAppointmentParamsSchema.parse(req.params);
 
-      logger
-        .withContext({ reservationToken })
-        .info({ route: '/agendamentos/:id', params }, 'Fetching appointment by id');
+        const requestLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+        requestLogger.info({ route: '/agendamentos/:id', params }, 'Fetching appointment by id');
 
-      const appointment = await service.getAppointmentById(params.id);
-      if (!appointment) {
-        return res.status(404).json({ error: 'NotFoundError', message: 'Appointment not found' });
-      }
+        const appointment = await service.getAppointmentById(params.id);
+        if (!appointment) {
+          return res
+            .status(404)
+            .json({ error: 'NotFoundError', message: 'Appointment not found' });
+        }
 
-      res.status(200).json(appointment);
+        res.status(200).json(appointment);
+      });
     } catch (error) {
       next(error);
     }
@@ -69,15 +78,16 @@ export function createAppointmentController({ service }: AppointmentControllerDe
 
   router.get('/agendamentos', async (req, res, next) => {
     try {
-      const reservationToken = getReservationToken(req);
-      const query = listAppointmentsQuerySchema.parse(req.query) satisfies ListAppointmentsQuery;
+      await runWithSpan('Controller:GET /agendamentos', async () => {
+        const reservationToken = getReservationToken(req);
+        const query = listAppointmentsQuerySchema.parse(req.query) satisfies ListAppointmentsQuery;
 
-      logger
-        .withContext({ reservationToken })
-        .info({ route: '/agendamentos', query }, 'Listing appointments');
+        const requestLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+        requestLogger.info({ route: '/agendamentos', query }, 'Listing appointments');
 
-      const appointments = await service.listAppointments(query);
-      res.status(200).json(appointments);
+        const appointments = await service.listAppointments(query);
+        res.status(200).json(appointments);
+      });
     } catch (error) {
       next(error);
     }
@@ -85,37 +95,61 @@ export function createAppointmentController({ service }: AppointmentControllerDe
 
   router.put('/agendamentos/:id/cancel', async (req, res, next) => {
     try {
-      const reservationToken = getReservationToken(req);
-      const params = cancelAppointmentParamsSchema.parse(req.params);
-      const body = cancelAppointmentBodySchema.parse(req.body) satisfies CancelAppointmentBody;
+      await runWithSpan('Controller:PUT /agendamentos/:id/cancel', async () => {
+        const reservationToken = getReservationToken(req);
+        const params = cancelAppointmentParamsSchema.parse(req.params);
+        const body = cancelAppointmentBodySchema.parse(req.body) satisfies CancelAppointmentBody;
 
-      logger
-        .withContext({ reservationToken })
-        .info({ route: '/agendamentos/:id/cancel', params, body }, 'Cancelling appointment');
+        const requestLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+        requestLogger.info(
+          { route: '/agendamentos/:id/cancel', params, body },
+          'Cancelling appointment'
+        );
 
-      const appointment = await service.cancelAppointment(params.id, body);
-      res.status(200).json(appointment);
+        const appointment = await service.cancelAppointment(params.id, body);
+        res.status(200).json(appointment);
+      });
     } catch (error) {
       next(error);
     }
   });
 
-  router.put('/agendamentos/:id/falta', async (req, res, next) => {
-    try {
-      const reservationToken = getReservationToken(req);
-      const params = markNoShowParamsSchema.parse(req.params);
-      const body = markNoShowBodySchema.parse(req.body) satisfies MarkNoShowBody;
+  router.put(
+    '/agendamentos/:id/falta',
+    ...(auth ? auth.requireRole('barbeiro') : []),
+    async (req, res, next) => {
+      try {
+        await runWithSpan('Controller:PUT /agendamentos/:id/falta', async () => {
+          const reservationToken = getReservationToken(req);
+          const params = markNoShowParamsSchema.parse(req.params);
+          const body = markNoShowBodySchema.parse(req.body) satisfies MarkNoShowBody;
 
-      logger
-        .withContext({ reservationToken })
-        .info({ route: '/agendamentos/:id/falta', params, body }, 'Marking appointment as no-show');
+          const requestLogger =
+            res.locals.logger ??
+            logger.withContext({ reservationToken, userId: res.locals.authUser?.id });
+          requestLogger.info(
+            { route: '/agendamentos/:id/falta', params, body },
+            'Marking appointment as no-show'
+          );
 
-      const appointment = await service.markNoShow(params.id, body);
-      res.status(200).json(appointment);
-    } catch (error) {
-      next(error);
+          if (!res.locals.authUser) {
+            return res
+              .status(401)
+              .json({ error: 'UnauthorizedError', message: 'Missing auth context' });
+          }
+
+          const appointment = await service.markNoShow(
+            params.id,
+            body,
+            res.locals.authUser.role
+          );
+          res.status(200).json(appointment);
+        });
+      } catch (error) {
+        next(error);
+      }
     }
-  });
+  );
 
   return router;
 }

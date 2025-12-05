@@ -16,9 +16,9 @@
     "lint": "eslint \"src/**/*.ts\" \"packages/shared/src/**/*.ts\"",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:ci": "vitest run --config vitest.config.ts",
+    "test:ci": "npm run build:shared && vitest run --config vitest.config.ts",
     "test:watch": "vitest --watch",
-    "test:concurrency": "vitest run tests/integration/booking_concurrency.test.ts",
+    "test:concurrency": "npm run build:shared && vitest run tests/integration/booking_concurrency.test.ts",
     "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {

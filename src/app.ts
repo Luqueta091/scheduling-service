@@ -11,13 +11,19 @@ import {
   config,
   logger,
   metricsRouter,
-  metricsMiddleware
+  metricsMiddleware,
+  traceMiddleware,
+  getCurrentTraceId
 } from '@barbershop/shared';
 
 import { createAppointmentController } from './controllers/appointmentController';
 import { DbAppointmentService } from './application/services/appointmentService';
 import { PostgresAppointmentRepository } from './repository/PostgresAppointmentRepository';
 import { errorMapper } from './infrastructure/http/errorMapper';
+import { UserRepository } from './repository/UserRepository';
+import { AuthService } from './application/services/authService';
+import { createAuthController } from './controllers/authController';
+import { createAuthMiddleware } from './infrastructure/http/authMiddleware';
 
 const openApiPath = path.resolve(process.cwd(), 'docs/openapi.yaml');
 let openApiDocument: unknown;
@@ -32,7 +38,11 @@ export function createApp() {
   const app = express();
   const appointmentRepository = new PostgresAppointmentRepository();
   const appointmentService = new DbAppointmentService(appointmentRepository);
+  const userRepository = new UserRepository();
+  const authService = new AuthService(userRepository);
+  const authMiddleware = createAuthMiddleware(authService);
 
+  app.use(traceMiddleware);
   app.disable('x-powered-by');
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
@@ -52,11 +62,16 @@ export function createApp() {
     })
   );
 
-  app.use((req, _res, next) => {
+  app.use((req, res, next) => {
     const reservationToken = req.header('x-reservation-token') ?? undefined;
-    logger
-      .withContext({ reservationToken })
-      .info({ method: req.method, path: req.path }, 'Incoming request');
+    const traceId = getCurrentTraceId();
+    const contextFields = {
+      reservationToken,
+      traceId
+    } as const;
+    res.locals.logContext = contextFields;
+    res.locals.logger = logger.withContext(contextFields);
+    res.locals.logger.info({ method: req.method, path: req.path }, 'Incoming request');
     next();
   });
 
@@ -69,13 +84,13 @@ export function createApp() {
     app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
   }
 
-  app.use(createAppointmentController({ service: appointmentService }));
+  app.use('/auth', createAuthController(authService));
+  app.use(createAppointmentController({ service: appointmentService, auth: authMiddleware }));
 
   app.get('/health', (req: Request, res: Response) => {
     const reservationToken = req.header('x-reservation-token') ?? undefined;
-    logger
-      .withContext({ reservationToken })
-      .info('Health check endpoint accessed');
+    const reqLogger = res.locals.logger ?? logger.withContext({ reservationToken });
+    reqLogger.info('Health check endpoint accessed');
 
     res.status(200).json({
       status: 'ok',

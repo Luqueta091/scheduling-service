@@ -17,8 +17,21 @@ const configSchema = z
     MIGRATIONS_DIR: z.string().optional(),
     SERVICE_NAME: z.string().default('scheduling-service'),
     EVENT_BUS_URL: z.string().optional(),
+    EVENT_BUS_DRIVER: z.enum(['in-memory', 'rabbitmq', 'nats']).optional(),
+    EVENT_BUS_EXCHANGE: z.string().optional(),
+    EVENT_BUS_QUEUE_GROUP: z.string().optional(),
     AVAILABILITY_BASE_URL: z.string().url().optional(),
     IDEMPOTENCY_TTL_SECONDS: z.coerce.number().int().positive().optional(),
+    TRACING_EXPORT_JSON: z
+      .string()
+      .optional()
+      .transform((value) => {
+        if (value === undefined) return undefined;
+        return value !== 'false';
+      }),
+    JWT_SECRET: z.string().min(8, 'JWT_SECRET is required and must be at least 8 characters').default('change-me'),
+    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
     METRICS_ENABLED: z
       .string()
       .optional()
@@ -32,7 +45,19 @@ const configSchema = z
     MIGRATIONS_DIR: values.MIGRATIONS_DIR ?? DEFAULT_MIGRATIONS_DIR,
     METRICS_ENABLED: values.METRICS_ENABLED ?? true,
     DATABASE_MAX_POOL: values.DATABASE_MAX_POOL ?? 10,
-    IDEMPOTENCY_TTL_SECONDS: values.IDEMPOTENCY_TTL_SECONDS ?? 86400
+    IDEMPOTENCY_TTL_SECONDS: values.IDEMPOTENCY_TTL_SECONDS ?? 86400,
+    EVENT_BUS_DRIVER:
+      values.EVENT_BUS_DRIVER ??
+      (values.EVENT_BUS_URL && values.EVENT_BUS_URL.startsWith('amqp')
+        ? 'rabbitmq'
+        : 'in-memory'),
+    EVENT_BUS_EXCHANGE: values.EVENT_BUS_EXCHANGE ?? 'domain.events',
+    EVENT_BUS_QUEUE_GROUP:
+      values.EVENT_BUS_QUEUE_GROUP ?? `${values.SERVICE_NAME}.workers`,
+    TRACING_EXPORT_JSON: values.TRACING_EXPORT_JSON ?? false,
+    JWT_SECRET: values.JWT_SECRET,
+    JWT_ACCESS_TTL_SECONDS: values.JWT_ACCESS_TTL_SECONDS,
+    JWT_REFRESH_TTL_SECONDS: values.JWT_REFRESH_TTL_SECONDS
   }));
 
 export type AppConfig = z.infer<typeof configSchema>;

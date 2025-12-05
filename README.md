@@ -23,6 +23,69 @@ cp .env.example .env
 npm run dev
 ```
 
+### Configurando o EventBus
+
+O serviço usa um barramento de eventos resiliente com fallback in-memory. Para desenvolvimento local simples, mantenha `EVENT_BUS_DRIVER=in-memory` (valor padrão do `.env.example`).
+
+Para utilizar RabbitMQ:
+
+1. Suba uma instância RabbitMQ (ex.: `docker run -p 5672:5672 rabbitmq:3-management`).
+2. Ajuste as variáveis no `.env`:
+
+```
+EVENT_BUS_DRIVER=rabbitmq
+EVENT_BUS_URL=amqp://guest:guest@localhost:5672
+EVENT_BUS_EXCHANGE=domain.events
+EVENT_BUS_QUEUE_GROUP=scheduling-service.workers
+```
+
+3. Reinicie o serviço. Em caso de indisponibilidade do broker, o adaptador tenta reconectar automaticamente e registra warnings no logger.
+
+#### Testando publicações de evento
+
+1. Execute `npm run test:ci` para validar os testes E2E que cobrem `AppointmentCreated`, `AppointmentCancelled` e `AppointmentNoShow`.
+2. Para validar manualmente, abra um consumer (por exemplo, `rabbitmqadmin get queue=<queue>`), crie um agendamento via HTTP e acompanhe o evento publicado.
+
+### Cliente de Slot / Availability
+
+Defina `AVAILABILITY_BASE_URL` para ativar o cliente HTTP resiliente. O adaptador aplica retries exponenciais, breaker e cache TTL baseado no `RESERVATION_TTL`. Em ambientes locais sem o serviço de slots, o stub in-memory permanece disponível e loga um aviso para cada validação realizada. A métrica `slot_service_health` (gauge) reflete o estado atual do breaker: `status="ok"|"degraded"|"down"`.
+
+### Observabilidade & Tracing
+
+- Cada requisição HTTP é envolvida por um span raiz (`HTTP <método> <rota>`); controladores e serviços criam spans filhos para DB, Slot Client e EventBus.
+- Os headers `x-trace-id`, `x-span-parent` (span id atual) e `x-response-time` são devolvidos em todas as respostas. Para encadear com chamadas do frontend, envie `x-trace-id`/`x-span-parent` nas requisições subsequentes.
+- Ative `TRACING_EXPORT_JSON=true` para que cada span seja exportado em JSON nos logs (`trace.span`).
+- Exemplo de chamada instrumentada:
+
+```bash
+curl -X POST http://localhost:3000/agendamentos \
+  -H "x-trace-id: web-trace-123" \
+  -H "x-span-parent: web-span-abc" \
+  -H "Content-Type: application/json" \
+  -d '{ "clientId": "...", ... }'
+```
+
+### Métricas Prometheus
+
+- `/metrics` expõe, além das métricas HTTP padrão, os contadores `appointments_created_total`, `appointments_cancelled_total`, `appointments_no_show_total`, `appointments_conflicts_total`, o histogram `appointment_creation_duration_seconds_bucket` e o gauge `slot_service_health`.
+- Para coletar com Prometheus local:
+
+```yaml
+scrape_configs:
+  - job_name: 'scheduling-service'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:3000']
+        labels:
+          service: scheduling
+```
+
+- Valide rapidamente:
+
+```bash
+curl -s http://localhost:3000/metrics | grep appointment_creation_duration_seconds
+```
+
 ## Banco de Dados
 
 O serviço utiliza PostgreSQL. Um stub está disponível no `docker-compose.yml` para desenvolvimento. Execute as migrações com:
@@ -99,11 +162,23 @@ curl -X PUT http://localhost:3000/agendamentos/{id}/cancel \
 ```bash
 curl -X PUT http://localhost:3000/agendamentos/{id}/falta \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token_barber>" \
   -H "x-reservation-token: resv_tok_demo" \
   -d '{
-    "markedBy": "barbeiro",
     "timestamp": "2025-12-03T15:45:00Z"
   }'
+```
+
+## Autenticação de barbeiros e admins
+
+- `POST /auth/login` — body `{ "email": "barber@example.com", "password": "senha" }`. Retorna `{ accessToken, refreshToken, user }`.
+- `POST /auth/refresh` — body `{ "refreshToken": "..." }`.
+- Endpoints protegidos utilizam `Authorization: Bearer <accessToken>` e podem exigir `requireRole('barbeiro')` ou `requireRole('admin')`. Exemplo:
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "barber@example.com", "password": "senha" }'
 ```
 
 ## Estrutura

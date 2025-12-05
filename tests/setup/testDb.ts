@@ -50,6 +50,7 @@ async function createSharedDependencies(connectionString: string) {
     try {
       await client.query('TRUNCATE TABLE appointments RESTART IDENTITY CASCADE');
       await client.query('TRUNCATE TABLE reservations RESTART IDENTITY CASCADE');
+      await client.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
       await client.query('TRUNCATE TABLE idempotency_keys RESTART IDENTITY CASCADE');
     } finally {
       client.release();
