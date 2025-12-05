@@ -1,13 +1,14 @@
 import request from 'supertest';
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it } from 'vitest';
 
-import { eventBus } from '@barbershop/shared';
+import { getEventBus } from '@barbershop/shared';
 
 import { setupTestDatabase, seedLockedReservation } from '../setup/testDb';
 import { seedStaffUser } from '../setup/seedUsers';
 
 let app: import('express').Express;
 let dbContext: Awaited<ReturnType<typeof setupTestDatabase>>;
+const eventBus = getEventBus();
 let unsubscribeAll: Array<() => void> = [];
 
 beforeAll(async () => {
@@ -40,19 +41,22 @@ describe('Event bus publications', () => {
       AppointmentNoShow: [] as Array<{ appointmentId: string; markedBy?: string }>
     };
 
-    unsubscribeAll.push(
-      eventBus.subscribe('AppointmentCreated', async (event) => {
-        received.AppointmentCreated.push(event.payload as { appointmentId: string });
-      }),
-      eventBus.subscribe('AppointmentCancelled', async (event) => {
-        received.AppointmentCancelled.push(event.payload as { appointmentId: string });
-      }),
-      eventBus.subscribe('AppointmentNoShow', async (event) => {
+    const unsubCreated =
+      (await eventBus.subscribe?.('appointment.created', async (payload) => {
+        received.AppointmentCreated.push(payload as { appointmentId: string });
+      })) ?? (() => {});
+    const unsubCancelled =
+      (await eventBus.subscribe?.('appointment.cancelled', async (payload) => {
+        received.AppointmentCancelled.push(payload as { appointmentId: string });
+      })) ?? (() => {});
+    const unsubNoShow =
+      (await eventBus.subscribe?.('appointment.no_show', async (payload) => {
         received.AppointmentNoShow.push(
-          event.payload as { appointmentId: string; markedBy?: string }
+          payload as { appointmentId: string; markedBy?: string; actorRole?: string }
         );
-      })
-    );
+      })) ?? (() => {});
+
+    unsubscribeAll.push(unsubCreated, unsubCancelled, unsubNoShow);
 
     const baseReservation = await seedLockedReservation({
       start: new Date('2025-12-03T15:00:00Z'),

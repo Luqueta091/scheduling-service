@@ -85,6 +85,31 @@ register.registerMetric(slotServiceHealthGauge);
 const SLOT_STATES = ['ok', 'degraded', 'down'] as const;
 export type SlotServiceHealthStatus = (typeof SLOT_STATES)[number];
 
+const lockAttempts = new Counter({
+  name: 'locks_attempts_total',
+  help: 'Total de tentativas de lock de slot'
+});
+
+const lockSuccess = new Counter({
+  name: 'locks_success_total',
+  help: 'Total de locks de slot bem-sucedidos'
+});
+
+const lockConflicts = new Counter({
+  name: 'locks_conflicts_total',
+  help: 'Total de locks que falharam por conflito/capacidade'
+});
+
+const lockExpired = new Counter({
+  name: 'locks_expired_total',
+  help: 'Total de locks expirados/liberados automaticamente'
+});
+
+register.registerMetric(lockAttempts);
+register.registerMetric(lockSuccess);
+register.registerMetric(lockConflicts);
+register.registerMetric(lockExpired);
+
 export const appointmentMetrics = {
   created: appointmentsCreated,
   cancelled: appointmentsCancelled,
@@ -106,3 +131,10 @@ export function updateSlotServiceHealth(status: SlotServiceHealthStatus): void {
 export function resetAllMetrics(): void {
   register.resetMetrics();
 }
+
+export const availabilityMetrics = {
+  lockAttempts,
+  lockSuccess,
+  lockConflicts,
+  lockExpired
+};

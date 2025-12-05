@@ -3,10 +3,19 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
-  eventBus,
   withTransaction,
   appointmentMetrics,
-  runWithSpan
+  runWithSpan,
+  logger,
+  getEventBus
+} from '@barbershop/shared';
+import {
+  APPOINTMENT_CANCELLED_EVENT,
+  APPOINTMENT_CREATED_EVENT,
+  APPOINTMENT_NO_SHOW_EVENT,
+  type AppointmentCancelledEvent,
+  type AppointmentCreatedEvent,
+  type AppointmentNoShowEvent
 } from '@barbershop/shared';
 
 import { Appointment } from '../../domain/appointment';
@@ -33,6 +42,7 @@ export interface AppointmentService {
 }
 
 const slotClient = buildSlotClient();
+const eventBus = getEventBus();
 
 type StaffRole = Extract<UserRole, 'barbeiro' | 'admin'>;
 
@@ -43,6 +53,7 @@ export class DbAppointmentService implements AppointmentService {
     data: CreateAppointmentRequest,
     headers: Record<string, string | undefined> = {}
   ): Promise<CreateAppointmentResponse> {
+    let lockedReservationId: string | null = null;
     return runWithSpan(
       'DbAppointmentService.createAppointment',
       async () => {
@@ -83,6 +94,8 @@ export class DbAppointmentService implements AppointmentService {
               throw new ValidationError('Reservation slot mismatch');
             }
 
+            lockedReservationId = reservation.id;
+
             await runWithSpan('SlotClient.validateReservationToken', () =>
               slotClient.validateReservationToken(data.reservationToken)
             );
@@ -108,6 +121,7 @@ export class DbAppointmentService implements AppointmentService {
             await runWithSpan('Repository.confirmReservation', () =>
               this.repository.confirmReservation(reservation.id, tx)
             );
+            lockedReservationId = null;
 
             const response = persisted.toDTO(data.reservationToken);
 
@@ -122,11 +136,11 @@ export class DbAppointmentService implements AppointmentService {
             await runWithSpan(
               'EventBus.publish',
               () =>
-                eventBus.publish({
-                  type: 'AppointmentCreated',
-                  payload: response
-                }),
-              { eventType: 'AppointmentCreated' }
+                eventBus.publish(
+                  APPOINTMENT_CREATED_EVENT,
+                  this.buildAppointmentCreatedEvent(persisted, data.reservationToken)
+                ),
+              { eventType: APPOINTMENT_CREATED_EVENT }
             );
 
             appointmentMetrics.created.inc();
@@ -139,6 +153,15 @@ export class DbAppointmentService implements AppointmentService {
 
           return response;
         } catch (error) {
+          if (lockedReservationId) {
+            await runWithSpan('Repository.releaseReservation', () =>
+              this.repository.releaseReservation(lockedReservationId!)
+            ).catch((releaseError) =>
+              logger.warn({ releaseError, lockedReservationId }, 'Failed to release reservation')
+            );
+            lockedReservationId = null;
+          }
+
           if (error instanceof ConflictError) {
             appointmentMetrics.conflicts.inc();
           }
@@ -182,11 +205,11 @@ export class DbAppointmentService implements AppointmentService {
           await runWithSpan(
             'EventBus.publish',
             () =>
-              eventBus.publish({
-                type: 'AppointmentCancelled',
-                payload: updated.toDTO()
-              }),
-            { eventType: 'AppointmentCancelled' }
+              eventBus.publish(
+                APPOINTMENT_CANCELLED_EVENT,
+                this.buildAppointmentCancelledEvent(updated, body.reason ?? null)
+              ),
+            { eventType: APPOINTMENT_CANCELLED_EVENT }
           );
 
           appointmentMetrics.cancelled.inc();
@@ -227,15 +250,11 @@ export class DbAppointmentService implements AppointmentService {
           await runWithSpan(
             'EventBus.publish',
             () =>
-              eventBus.publish({
-                type: 'AppointmentNoShow',
-                payload: {
-                  ...updated.toDTO(),
-                  markedBy: actorRole,
-                  markedAt: body.timestamp ?? new Date().toISOString()
-                }
-              }),
-            { eventType: 'AppointmentNoShow' }
+              eventBus.publish(
+                APPOINTMENT_NO_SHOW_EVENT,
+                this.buildAppointmentNoShowEvent(updated, actorRole, body.timestamp)
+              ),
+            { eventType: APPOINTMENT_NO_SHOW_EVENT }
           );
 
           appointmentMetrics.noShow.inc();
@@ -244,5 +263,50 @@ export class DbAppointmentService implements AppointmentService {
         }),
       { 'appointment.id': id, actorRole }
     );
+  }
+
+  private buildAppointmentCreatedEvent(
+    appointment: Appointment,
+    reservationToken?: string
+  ): AppointmentCreatedEvent {
+    const dto = appointment.toDTO(reservationToken);
+    return {
+      appointmentId: dto.appointmentId,
+      unitId: dto.unitId,
+      serviceId: dto.serviceId,
+      clientId: dto.clientId,
+      barberId: dto.barberId ?? null,
+      scheduledAt: dto.start,
+      reservationToken: dto.reservationToken
+    };
+  }
+
+  private buildAppointmentCancelledEvent(
+    appointment: Appointment,
+    reason?: string | null
+  ): AppointmentCancelledEvent {
+    const snapshot = appointment.propsSnapshot;
+    return {
+      appointmentId: snapshot.id,
+      unitId: snapshot.unitId,
+      serviceId: snapshot.serviceId,
+      cancelledAt: snapshot.updatedAt.toISOString(),
+      reason: reason ?? snapshot.notes ?? null
+    };
+  }
+
+  private buildAppointmentNoShowEvent(
+    appointment: Appointment,
+    actorRole: StaffRole,
+    timestamp?: string
+  ): AppointmentNoShowEvent {
+    const snapshot = appointment.propsSnapshot;
+    return {
+      appointmentId: snapshot.id,
+      unitId: snapshot.unitId,
+      serviceId: snapshot.serviceId,
+      occurredAt: timestamp ?? snapshot.updatedAt.toISOString(),
+      actorRole
+    };
   }
 }

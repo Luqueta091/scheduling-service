@@ -17,7 +17,7 @@ const configSchema = z
     MIGRATIONS_DIR: z.string().optional(),
     SERVICE_NAME: z.string().default('scheduling-service'),
     EVENT_BUS_URL: z.string().optional(),
-    EVENT_BUS_DRIVER: z.enum(['in-memory', 'rabbitmq', 'nats']).optional(),
+    EVENT_BUS_DRIVER: z.enum(['in-memory', 'inmemory', 'rabbitmq', 'nats']).optional(),
     EVENT_BUS_EXCHANGE: z.string().optional(),
     EVENT_BUS_QUEUE_GROUP: z.string().optional(),
     AVAILABILITY_BASE_URL: z.string().url().optional(),
@@ -46,11 +46,14 @@ const configSchema = z
     METRICS_ENABLED: values.METRICS_ENABLED ?? true,
     DATABASE_MAX_POOL: values.DATABASE_MAX_POOL ?? 10,
     IDEMPOTENCY_TTL_SECONDS: values.IDEMPOTENCY_TTL_SECONDS ?? 86400,
-    EVENT_BUS_DRIVER:
-      values.EVENT_BUS_DRIVER ??
-      (values.EVENT_BUS_URL && values.EVENT_BUS_URL.startsWith('amqp')
-        ? 'rabbitmq'
-        : 'in-memory'),
+    EVENT_BUS_DRIVER: (() => {
+      const driver =
+        values.EVENT_BUS_DRIVER ??
+        (values.EVENT_BUS_URL && values.EVENT_BUS_URL.startsWith('amqp')
+          ? 'rabbitmq'
+          : 'in-memory');
+      return driver === 'inmemory' ? 'in-memory' : driver;
+    })(),
     EVENT_BUS_EXCHANGE: values.EVENT_BUS_EXCHANGE ?? 'domain.events',
     EVENT_BUS_QUEUE_GROUP:
       values.EVENT_BUS_QUEUE_GROUP ?? `${values.SERVICE_NAME}.workers`,

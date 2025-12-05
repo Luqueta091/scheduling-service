@@ -52,14 +52,15 @@ async function createSharedDependencies(connectionString: string) {
       await client.query('TRUNCATE TABLE reservations RESTART IDENTITY CASCADE');
       await client.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
       await client.query('TRUNCATE TABLE idempotency_keys RESTART IDENTITY CASCADE');
+      await client.query('TRUNCATE TABLE availability_slot_templates RESTART IDENTITY CASCADE');
     } finally {
       client.release();
     }
   };
 
   const clearEventBus = async () => {
-    const { eventBus } = (await import('@barbershop/shared')) as unknown as SharedModule;
-    eventBus.clearAllSubscribers();
+    const { clearEventBusSubscribers } = (await import('@barbershop/shared')) as unknown as SharedModule;
+    clearEventBusSubscribers();
   };
 
   return { shared, truncateAll, clearEventBus } as const;

@@ -27,4 +27,5 @@ export interface AppointmentRepository {
   list(query: ListAppointmentsQuery): Promise<ListAppointmentsResponse>;
   lockReservationByToken(token: string, client: PoolClient): Promise<ReservationRecord | null>;
   confirmReservation(reservationId: string, client: PoolClient): Promise<void>;
+  releaseReservation(reservationId: string, client?: PoolClient): Promise<void>;
 }
