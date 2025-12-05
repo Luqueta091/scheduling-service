@@ -25,6 +25,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,7 +49,9 @@ jobs:
           done
 
       - name: Export DB URL
-        run: echo "TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/scheduling_test" >> $GITHUB_ENV
 
       - name: Run DB migrations
         run: npm run migrate
