@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import type { ConfirmChannel, Connection } from 'amqplib';
-import amqp from 'amqplib';
+import type { Channel, ChannelModel } from 'amqplib';
+import { connect } from 'amqplib';
 
 import { config } from '../config';
 import { logger } from '../logger';
@@ -14,8 +14,8 @@ interface RabbitMqEventBusOptions {
 }
 
 export class RabbitMqEventBus implements IEventBus {
-  private connection: Connection | null = null;
-  private channel: ConfirmChannel | null = null;
+  private connection: ChannelModel | null = null;
+  private channel: Channel | null = null;
   private connecting: Promise<void> | null = null;
 
   constructor(private readonly options: RabbitMqEventBusOptions) {}
@@ -34,26 +34,21 @@ export class RabbitMqEventBus implements IEventBus {
         payload
       };
 
-      await new Promise<void>((resolve, reject) => {
-        this.channel!.publish(
-          this.options.exchange,
-          eventName,
-          Buffer.from(JSON.stringify(envelope)),
-          {
-            contentType: 'application/json',
-            persistent: true,
-            messageId: envelope.id,
-            type: eventName
-          },
-          (err: Error | null | undefined) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          }
-        );
-      });
+      const published = this.channel.publish(
+        this.options.exchange,
+        eventName,
+        Buffer.from(JSON.stringify(envelope)),
+        {
+          contentType: 'application/json',
+          persistent: true,
+          messageId: envelope.id,
+          type: eventName
+        }
+      );
+
+      if (!published) {
+        logger.warn({ eventName }, 'RabbitMQ publish buffer is full');
+      }
     } catch (error) {
       logger.error({ error, eventName }, 'Failed to publish event to RabbitMQ');
       if (config.NODE_ENV === 'production') {
@@ -82,21 +77,24 @@ export class RabbitMqEventBus implements IEventBus {
 
   private async connect(): Promise<void> {
     try {
-      this.connection = await amqp.connect(this.options.url);
-      this.channel = await this.connection.createConfirmChannel();
-      await this.channel.assertExchange(this.options.exchange, 'topic', {
-        durable: true
-      });
-
-      this.connection.on('error', (error) => {
+      const connection = await connect(this.options.url);
+      connection.on('error', (error: unknown) => {
         logger.error({ error }, 'RabbitMQ connection error');
         this.reset();
       });
 
-      this.connection.on('close', () => {
+      connection.on('close', () => {
         logger.warn('RabbitMQ connection closed');
         this.reset();
       });
+
+      const channel = await connection.createChannel();
+      await channel.assertExchange(this.options.exchange, 'topic', {
+        durable: true
+      });
+
+      this.connection = connection;
+      this.channel = channel;
     } catch (error) {
       logger.error({ error }, 'Failed to establish RabbitMQ connection');
       this.reset();
@@ -105,13 +103,26 @@ export class RabbitMqEventBus implements IEventBus {
   }
 
   private reset(): void {
-    if (this.channel) {
-      this.channel.removeAllListeners();
-    }
-    if (this.connection) {
-      this.connection.removeAllListeners();
-    }
+    const channel = this.channel;
+    const connection = this.connection;
     this.channel = null;
     this.connection = null;
+
+    if (channel) {
+      channel
+        .close()
+        .catch((error) => logger.warn({ error }, 'Failed to close RabbitMQ channel'))
+        .finally(() => {
+          channel.removeAllListeners();
+        });
+    }
+    if (connection) {
+      connection
+        .close()
+        .catch((error) => logger.warn({ error }, 'Failed to close RabbitMQ connection'))
+        .finally(() => {
+          connection.removeAllListeners();
+        });
+    }
   }
 }

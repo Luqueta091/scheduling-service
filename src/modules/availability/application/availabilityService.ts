@@ -99,7 +99,7 @@ export class AvailabilityService {
           slots
         };
       },
-      params
+      params as unknown as Record<string, unknown>
     );
   }
 
@@ -175,7 +175,7 @@ export class AvailabilityService {
             expiresAt: expiresAt.toISOString()
           };
         }),
-      input
+      input as unknown as Record<string, unknown>
     );
   }
 
