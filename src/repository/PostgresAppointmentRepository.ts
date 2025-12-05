@@ -248,4 +248,16 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
       [reservationId]
     );
   }
+
+  async releaseReservation(reservationId: string, client?: PoolClient): Promise<void> {
+    const executor = client ?? getDb();
+    await executor.query(
+      `UPDATE reservations
+          SET status = 'released',
+              updated_at = now()
+        WHERE id = $1
+          AND status = 'locked'`,
+      [reservationId]
+    );
+  }
 }
