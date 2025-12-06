@@ -24,6 +24,7 @@ import { UserRepository } from './repository/UserRepository';
 import { AuthService } from './application/services/authService';
 import { createAuthController } from './controllers/authController';
 import { createAuthMiddleware } from './infrastructure/http/authMiddleware';
+import { createAvailabilityRouter } from './modules/availability';
 
 const openApiPath = path.resolve(process.cwd(), 'docs/openapi.yaml');
 let openApiDocument: unknown;
@@ -85,6 +86,7 @@ export function createApp() {
   }
 
   app.use('/auth', createAuthController(authService));
+  app.use(createAvailabilityRouter());
   app.use(createAppointmentController({ service: appointmentService, auth: authMiddleware }));
 
   app.get('/health', (req: Request, res: Response) => {

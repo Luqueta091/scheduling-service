@@ -7,7 +7,7 @@ Serviço de agendamento autoritativo para uma barbearia, responsável por criar,
 - **Stack:** Node.js + TypeScript, Express, PostgreSQL, Testcontainers, Vitest.
 - **Arquitetura:** camadas separadas (interfaces → aplicação → domínio → infraestrutura) com uso de transações e locks pessimistas em reservas.
 - **Observabilidade:** logs estruturados (Pino), métricas Prometheus, ganchos básicos para tracing com OpenTelemetry API.
-- **Eventos:** publicação em barramento (stub local) para `AppointmentCreated`, `AppointmentCancelled`, `AppointmentNoShow`.
+- **Eventos:** publicação em barramento (stub local) para `AppointmentCreated`, `AppointmentCancelled`, `AppointmentNoShow`, além dos novos `SlotLocked`/`SlotReleased` do módulo de availability.
 
 ## Pré-requisitos
 
@@ -40,6 +40,16 @@ EVENT_BUS_QUEUE_GROUP=scheduling-service.workers
 ```
 
 3. Reinicie o serviço. Em caso de indisponibilidade do broker, o adaptador tenta reconectar automaticamente e registra warnings no logger.
+
+### Eventos publicados
+
+Todos os eventos saem pelo exchange configurado (`EVENT_BUS_EXCHANGE`, padrão `domain.events`):
+
+- `slot.locked` — emitido pelo Availability Service assim que um lock é criado. Payload inclui `reservationToken`, `unitId`, `serviceId`, `date` (`YYYY-MM-DD`), `startTime`/`endTime` (`HH:mm`), `capacityTotal` e `capacityUsed`.
+- `slot.released` — emitido quando um lock é liberado (manual/cancelamento/expiração). Reusa os campos acima e adiciona `reason: "manual" | "cancelled" | "expired"`.
+- `appointment.created`, `appointment.cancelled`, `appointment.no_show` — permanecem com o mesmo contrato descrito anteriormente e continuam alimentando o Notifications Service.
+
+Em ambientes de desenvolvimento/CI rodando apenas com o fallback in-memory, é possível inspecionar os eventos registrando handlers direto no `InMemoryEventBus` usado nos testes.
 
 #### Testando publicações de evento
 
